@@ -6,10 +6,6 @@
       "use": "@vercel/node"
     },
     {
-      "src": "index.js",
-      "use": "@vercel/node"
-    },
-    {
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
@@ -19,15 +15,7 @@
   ],
   "routes": [
     {
-      "src": "/api/students/(.*)",
-      "dest": "/server.js"
-    },
-    {
-      "src": "/api/activities/(.*)",
-      "dest": "/index.js"
-    },
-    {
-      "src": "/api/send-email",
+      "src": "/api/.*",
       "dest": "/server.js"
     },
     {
