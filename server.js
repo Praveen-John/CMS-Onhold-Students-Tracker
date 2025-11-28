@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import 'dotenv/config';
 
 const app = express();
+const PORT = process.env.PORT || 5000;
 
 // --- MIDDLEWARE ---
 app.use(cors());
@@ -60,6 +61,11 @@ async function connectToDatabase() {
     return cached.conn;
 }
 
+// Connect to database
+connectToDatabase().catch(err => {
+    console.error('Failed to initialize database connection:', err);
+});
+
 // --- SCHEMAS ---
 const studentSchema = new mongoose.Schema({
     id: { type: String, required: true, unique: true },
@@ -99,7 +105,6 @@ const Activity = mongoose.model('Activity', activitySchema);
 // 1. Get all students
 app.get('/api/students', async (req, res) => {
     try {
-        await connectToDatabase();
         const students = await Student.find().sort({ createdAt: -1 });
         res.json(students);
     } catch (err) {
@@ -110,7 +115,6 @@ app.get('/api/students', async (req, res) => {
 // 2. Add a student
 app.post('/api/students', async (req, res) => {
     try {
-        await connectToDatabase();
         const exists = await Student.findOne({ id: req.body.id });
         if (exists) {
             return res.status(400).json({ message: "Student ID already exists" });
@@ -126,7 +130,6 @@ app.post('/api/students', async (req, res) => {
 // 3. Update a student
 app.put('/api/students/:id', async (req, res) => {
     try {
-        await connectToDatabase();
         const updatedStudent = await Student.findOneAndUpdate(
             { id: req.params.id }, 
             req.body, 
@@ -144,7 +147,6 @@ app.put('/api/students/:id', async (req, res) => {
 // 4. Delete a student
 app.delete('/api/students/:id', async (req, res) => {
     try {
-        await connectToDatabase();
         const result = await Student.findOneAndDelete({ id: req.params.id });
         if (!result) {
             return res.status(404).json({ message: 'Student not found' });
@@ -158,7 +160,6 @@ app.delete('/api/students/:id', async (req, res) => {
 // 5. Get activities
 app.get('/api/activities', async (req, res) => {
     try {
-        await connectToDatabase();
         const activities = await Activity.find().sort({ createdAt: -1 }).limit(1000);
         res.json(activities);
     } catch (err) {
@@ -169,7 +170,6 @@ app.get('/api/activities', async (req, res) => {
 // 6. Log activity
 app.post('/api/activities', async (req, res) => {
     try {
-        await connectToDatabase();
         const newActivity = new Activity(req.body);
         const savedActivity = await newActivity.save();
         res.status(201).json(savedActivity);
@@ -220,5 +220,7 @@ app.post('/api/send-email', async (req, res) => {
     }
 });
 
-// --- EXPORT FOR VERCEL SERVERLESS ---
-export default app;
+// --- SERVER START ---
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
