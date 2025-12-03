@@ -504,7 +504,7 @@ const App = () => {
                 onAnalyze={(s) => setSelectedStudentForAnalysis(s)} 
                 onDelete={isAdmin ? handleDeleteStudent : undefined}
                 onEdit={handleEditStudent}
-                onToggleReminder={isAdmin ? handleToggleReminder : undefined}
+                onToggleReminder={handleToggleReminder}
             />
           </div>
         );
