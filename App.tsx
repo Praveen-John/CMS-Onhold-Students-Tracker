@@ -15,7 +15,7 @@ import { MenuIcon, SparklesIcon, UsersIcon, ChartBarIcon, HomeIcon, FunnelIcon, 
 // --- CONFIGURATION ---
 const STORAGE_KEY_USER = 'cms_user_session_v1';
 const API_BASE_URL = import.meta.env.PROD ? '/api' : 'http://localhost:5000/api'; // Production uses relative API calls
-const ADMIN_USERS = ['praveen_k@lmes.in', 'support@lmes.in'];
+const ADMIN_USERS = ['praveen_k@lmes.in', 'nawinrexroy_j@lmes.in'];
 
 // Helper to generate HTML table for emails
 const generateEmailTable = (students: Student[], title: string, agentName: string) => {
