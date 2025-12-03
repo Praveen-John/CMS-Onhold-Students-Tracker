@@ -292,6 +292,7 @@ const App = () => {
     
     const today = new Date().toISOString().split('T')[0];
     const reminders = studentsOverride || viewableStudents.filter(s => 
+        !s.stopReminders &&
         s.reminderDate && 
         s.reminderDate <= today && 
         (s.status === Status.ON_HOLD || s.status === Status.PENDING)
@@ -314,29 +315,34 @@ const App = () => {
 
     let sentCount = 0;
     let failedCount = 0;
+    const agents = Object.keys(tasksByAgent);
 
-    const emailBody = generateEmailTable(reminders, new Date().toDateString(), "Operations Team");
-    const subject = `[Reminder] ${autoLabel || 'Action Required'} - Follow-ups for ${reminders.length} students`;
+    for (const agentName of agents) {
+        const agentTasks = tasksByAgent[agentName];
+        
+        const emailBody = generateEmailTable(agentTasks, new Date().toDateString(), agentName);
+        const subject = `[Reminder] ${autoLabel || 'Action Required'} - Follow-ups for ${agentTasks.length} students`;
 
-    try {
-        await sendEmailViaBackend("operation@lmes.in", subject, emailBody);
-        sentCount++;
-    } catch (err) {
-        console.error(`Failed to send to operation@lmes.in`, err);
-        failedCount++;
+        try {
+            await sendEmailViaBackend("gokul_s@lmes.in", subject, emailBody);
+            sentCount++;
+        } catch (err) {
+            console.error(`Failed to send to operation@lmes.in for agent ${agentName}`, err);
+            failedCount++;
+        }
     }
 
     if (autoLabel) {
             // Re-fetch to sync
             await fetchData();
-            logActivity('SEND_EMAIL', `Auto-sent ${autoLabel} emails to operation@lmes.in.`);
+            logActivity('SEND_EMAIL', `Auto-sent ${autoLabel} emails to ${sentCount} agents.`);
     } else {
             if (sentCount > 0) {
-            logActivity('SEND_EMAIL', `Manual dispatch to operation@lmes.in.`);
-            setNotification({ message: `Emails sent to operation@lmes.in.`, type: 'success' });
+            logActivity('SEND_EMAIL', `Manual dispatch to ${sentCount} agents.`);
+            setNotification({ message: `Emails sent for ${sentCount} agents.`, type: 'success' });
             }
             if (failedCount > 0) {
-                setNotification({ message: `Failed to send to operation@lmes.in. Check server logs.`, type: 'error' });
+                setNotification({ message: `Failed to send for ${failedCount} agents. Check server logs.`, type: 'error' });
             }
     }
     setIsSendingEmail(false);
