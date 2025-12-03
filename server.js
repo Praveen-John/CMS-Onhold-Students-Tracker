@@ -115,7 +115,6 @@ const studentSchema = new mongoose.Schema({
     followUpComments: String,
     status: String,
     createdByEmail: String,
-    remindersSent: [String],
     stopReminders: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 });

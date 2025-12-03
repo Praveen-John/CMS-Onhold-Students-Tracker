@@ -17,7 +17,6 @@ export interface Student {
   createdByEmail?: string;
   
   // Automation Fields
-  remindersSent?: string[]; // e.g. ['prev_day', 'morning', 'evening']
   stopReminders?: boolean;  // If true, auto-reminders are disabled
 }
 

@@ -186,7 +186,6 @@ const App = () => {
     const studentWithUser = {
         ...newStudent,
         createdByEmail: user || 'unknown',
-        remindersSent: []
     };
     
     try {
@@ -203,6 +202,10 @@ const App = () => {
         logActivity('ADD_STUDENT', `Added student: ${newStudent.studentName}`);
         setActiveSegment('All Students');
         setNotification({ message: 'Student added successfully', type: 'success' });
+        
+        // Send reminder for the new student
+        handleSendManualReminders([savedStudent], 'New Student Reminder');
+
     } catch (e) {
         setNotification({ message: 'Error saving student to server', type: 'error' });
     }
@@ -334,25 +337,6 @@ const App = () => {
     }
 
     if (autoLabel) {
-            // Update "remindersSent" tags in DB
-            const updates = reminders.map(s => {
-                let tag = '';
-                if (autoLabel.includes('Pre-day')) tag = 'prev_day';
-                if (autoLabel.includes('Morning')) tag = 'morning';
-                if (autoLabel.includes('Evening')) tag = 'evening';
-                const newTags = s.remindersSent ? [...s.remindersSent, tag] : [tag];
-                return { ...s, remindersSent: newTags };
-            });
-
-            // Perform updates sequentially or parallel
-            for (const s of updates) {
-                 await fetch(`${API_BASE_URL}/students/${s.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(s)
-                 });
-            }
-            
             // Re-fetch to sync
             await fetchData();
             logActivity('SEND_EMAIL', `Auto-sent ${autoLabel} emails to ${sentCount} agents.`);
@@ -379,45 +363,47 @@ const App = () => {
           const hour = now.getHours();
           const minutes = now.getMinutes();
           
-          const isMorningTrigger = hour === 11 && minutes >= 30 && minutes < 35;
-          const isEveningTrigger = hour === 17 && minutes >= 0 && minutes < 5;
-          const isPreDayTrigger = hour === 10 && minutes >= 0 && minutes < 5; 
+          const isTenAMTrigger = hour === 10 && minutes >= 0 && minutes < 5;
+          const isOnePMTrigger = hour === 13 && minutes >= 0 && minutes < 5;
+          const isFourPMTrigger = hour === 16 && minutes >= 0 && minutes < 5;
+          const isSixPMTrigger = hour === 18 && minutes >= 0 && minutes < 5;
+          const isEightPMTrigger = hour === 20 && minutes >= 0 && minutes < 5;
 
           const pendingStudents = students.filter(s => !s.stopReminders && (s.status === Status.ON_HOLD || s.status === Status.PENDING));
 
-          if (isPreDayTrigger) {
-              const targetDate = new Date();
-              targetDate.setDate(targetDate.getDate() + 1);
-              const tomorrowStr = targetDate.toISOString().split('T')[0];
-
-              const preDayBatch = pendingStudents.filter(s => 
-                  s.reminderDate === tomorrowStr && 
-                  (!s.remindersSent || !s.remindersSent.includes('prev_day'))
-              );
-              
-              if (preDayBatch.length > 0) {
-                  handleSendManualReminders(preDayBatch, 'Pre-day Reminder');
+          if (isTenAMTrigger) {
+              const batch = pendingStudents.filter(s => s.reminderDate === todayStr);
+              if (batch.length > 0) {
+                  handleSendManualReminders(batch, '10:00 AM Reminder');
               }
           }
 
-          if (isMorningTrigger) {
-               const morningBatch = pendingStudents.filter(s => 
-                  s.reminderDate === todayStr && 
-                  (!s.remindersSent || !s.remindersSent.includes('morning'))
-               );
-               if (morningBatch.length > 0) {
-                   handleSendManualReminders(morningBatch, 'Morning Reminder');
+          if (isOnePMTrigger) {
+               const batch = pendingStudents.filter(s => s.reminderDate === todayStr);
+               if (batch.length > 0) {
+                   handleSendManualReminders(batch, '1:00 PM Reminder');
                }
           }
 
-          if (isEveningTrigger) {
-               const eveningBatch = pendingStudents.filter(s => 
-                  s.reminderDate === todayStr && 
-                  (!s.remindersSent || !s.remindersSent.includes('evening'))
-               );
-               if (eveningBatch.length > 0) {
-                   handleSendManualReminders(eveningBatch, 'Evening Reminder');
+          if (isFourPMTrigger) {
+               const batch = pendingStudents.filter(s => s.reminderDate === todayStr);
+               if (batch.length > 0) {
+                   handleSendManualReminders(batch, '4:00 PM Reminder');
                }
+          }
+
+          if (isSixPMTrigger) {
+               const batch = pendingStudents.filter(s => s.reminderDate === todayStr);
+               if (batch.length > 0) {
+                   handleSendManualReminders(batch, '6:00 PM Reminder');
+               }
+          }
+
+          if (isEightPMTrigger) {
+                const batch = pendingStudents.filter(s => s.reminderDate === todayStr);
+                if (batch.length > 0) {
+                    handleSendManualReminders(batch, '8:00 PM Reminder');
+                }
           }
 
       }, 60000);
