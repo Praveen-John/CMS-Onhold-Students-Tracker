@@ -38,64 +38,30 @@ if (!MONGO_URI) {
 }
 
 // --- MONGODB CONNECTION ---
-console.log('--- DATABASE CONNECTION LOGIC START ---');
-let cached = global.mongo;
-
-if (!cached) {
-    cached = global.mongo = { conn: null, promise: null };
-    console.log('Initialized global mongoose cache.');
-}
-
-async function connectToDatabase() {
-    console.log('connectToDatabase called.');
-    if (cached.conn) {
-        console.log('Using cached database connection.');
-        return cached.conn;
-    }
-
-    if (!cached.promise) {
-        console.log('No existing promise, creating new connection promise.');
+const connectToDatabase = async () => {
+    try {
+        // The options are simplified for broader compatibility and include Mongoose 6+ defaults
         const opts = {
-            bufferCommands: false,
             maxPoolSize: 10,
             serverSelectionTimeoutMS: 5000,
             socketTimeoutMS: 45000,
         };
 
-        cached.promise = mongoose.connect(MONGO_URI, opts)
-            .then(mongoose => {
-                console.log('✅✅✅ MongoDB Connection Successful (via promise)');
-                return mongoose;
-            })
-            .catch(err => {
-                console.error('❌❌❌ MongoDB Connection Error (in promise catch):', err.message);
-                console.error('Full error object:', JSON.stringify(err, null, 2));
-                cached.promise = null; // Reset promise on error
-                throw err;
-            });
-    } else {
-        console.log('Waiting for existing connection promise to resolve.');
-    }
+        console.log('Attempting to connect to MongoDB...');
+        await mongoose.connect(MONGO_URI, opts);
+        console.log('✅✅✅ MongoDB Connection Successful');
 
-    try {
-        cached.conn = await cached.promise;
-        console.log('Database connection promise resolved.');
     } catch (err) {
-        console.error('❌❌❌ Failed to await connection promise:', err.message);
-        throw err; // Re-throw to be caught by the caller
+        console.error('❌❌❌ MongoDB Connection Error:', err.message);
+        // In a local dev environment, you might want the server to exit if it can't connect.
+        // In a serverless/production environment, the container would likely crash and restart,
+        // which might be the desired behavior.
+        process.exit(1);
     }
-    
-    return cached.conn;
-}
+};
 
-// Initial connection attempt
-console.log('--- ATTEMPTING INITIAL DATABASE CONNECTION ---');
-connectToDatabase().catch(err => {
-    // This will catch errors from the initial connection attempt
-    console.error('--- FAILED TO INITIALIZE DATABASE CONNECTION (in top-level catch) ---');
-    console.error('Error message:', err.message);
-});
-console.log('--- DATABASE CONNECTION LOGIC REGISTERED ---');
+// We will call this function before starting the server
+// This replaces the scattered connection logic.
 
 
 // --- SCHEMAS ---
@@ -138,7 +104,6 @@ console.log('--- SCHEMAS AND MODELS CREATED ---');
 app.get('/api/students', async (req, res) => {
     console.log('GET /api/students');
     try {
-        await connectToDatabase();
         const students = await Student.find().sort({ createdAt: -1 });
         res.json(students);
     } catch (err) {
@@ -151,7 +116,6 @@ app.get('/api/students', async (req, res) => {
 app.post('/api/students', async (req, res) => {
     console.log('POST /api/students');
     try {
-        await connectToDatabase();
         const exists = await Student.findOne({ id: req.body.id });
         if (exists) {
             return res.status(400).json({ message: "Student ID already exists" });
@@ -169,7 +133,6 @@ app.post('/api/students', async (req, res) => {
 app.put('/api/students/:id', async (req, res) => {
     console.log(`PUT /api/students/${req.params.id}`);
     try {
-        await connectToDatabase();
         const updatedStudent = await Student.findOneAndUpdate(
             { id: req.params.id }, 
             req.body, 
@@ -189,7 +152,6 @@ app.put('/api/students/:id', async (req, res) => {
 app.delete('/api/students/:id', async (req, res) => {
     console.log(`DELETE /api/students/${req.params.id}`);
     try {
-        await connectToDatabase();
         const result = await Student.findOneAndDelete({ id: req.params.id });
         if (!result) {
             return res.status(404).json({ message: 'Student not found' });
@@ -205,7 +167,6 @@ app.delete('/api/students/:id', async (req, res) => {
 app.get('/api/activities', async (req, res) => {
     console.log('GET /api/activities');
     try {
-        await connectToDatabase();
         const activities = await Activity.find().sort({ createdAt: -1 }).limit(1000);
         res.json(activities);
     } catch (err) {
@@ -218,7 +179,6 @@ app.get('/api/activities', async (req, res) => {
 app.post('/api/activities', async (req, res) => {
     console.log('POST /api/activities');
     try {
-        await connectToDatabase();
         const newActivity = new Activity(req.body);
         const savedActivity = await newActivity.save();
         res.status(201).json(savedActivity);
@@ -266,7 +226,6 @@ const generateEmailTable = (students, title, agentName) => {
 // Helper to log activity from the server
 const logActivity = async (action, details, user = 'SYSTEM') => {
     try {
-        await connectToDatabase();
         const newActivity = new Activity({
             id: Date.now().toString(),
             user,
@@ -307,6 +266,10 @@ app.get('/api/cron/send-reminders', async (req, res) => {
 
     // 1. Authenticate Cron Job
     const authHeader = req.headers.authorization;
+    console.log('CRON: Auth header received:', authHeader ? 'Yes' : 'No');
+    console.log('CRON: CRON_SECRET exists:', process.env.CRON_SECRET ? 'Yes' : 'No');
+    console.log('CRON: Auth header matches secret:', authHeader === `Bearer ${process.env.CRON_SECRET}` ? 'Yes' : 'No');
+
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
         console.log('CRON: Unauthorized access attempt.');
         return res.status(401).json({ message: 'Unauthorized' });
@@ -314,40 +277,32 @@ app.get('/api/cron/send-reminders', async (req, res) => {
 
     try {
         // 2. Connect to DB
-        await connectToDatabase();
         console.log('CRON: Database connected.');
 
         // 3. Fetch students who need reminders
         const today = new Date();
-        today.setHours(0, 0, 0, 0); // Set to beginning of the day for date comparison
-        const todayStr = today.toISOString().split('T')[0];
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
 
-        // Enhanced timezone logging for debugging
-        console.log(`CRON: Today's date filtering: ${todayStr}`);
-        console.log(`CRON: Local time: ${new Date().toLocaleString()}`);
-        console.log(`CRON: UTC time: ${new Date().toUTCString()}`);
-        console.log(`CRON: Server timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
-        console.log(`CRON: Date comparison details:
-  - Local midnight: ${today.toLocaleDateString()}
-  - ISO string: ${today.toISOString()}
-  - Filter string: ${todayStr}`);
 
         // Status enum values from types.ts
-        const ON_HOLD = 'On-Hold';
-        const PENDING = 'Pending';
-
-        const studentsToRemind = await Student.find({
-            stopReminders: { $ne: true },
-            reminderDate: { $lte: todayStr },
-            status: { $in: [ON_HOLD, PENDING] }
-        });
-
-        if (studentsToRemind.length === 0) {
-            console.log('CRON: No students require reminders today.');
-            await logActivity('CRON_JOB', 'Ran successfully, no reminders to send.');
-            return res.status(200).json({ message: "No reminders to send." });
-        }
-        console.log(`CRON: Found ${studentsToRemind.length} students to remind.`);
+        const ON_HOLD = 'On hold';
+                const PENDING = 'Pending';
+        
+                const studentsToRemind = await Student.find({
+                    stopReminders: { $ne: true },
+                    reminderDate: { $lte: todayStr },
+                    status: { $in: [ON_HOLD, PENDING] }
+                });
+        
+                if (studentsToRemind.length === 0) {
+                    console.log('CRON: No students require reminders today.');
+                    await logActivity('CRON_JOB', 'Ran successfully, no reminders to send.');
+                    return res.status(200).json({ message: "No reminders to send." });
+                }
+                console.log(`CRON: Found ${studentsToRemind.length} students to remind.`);
 
         // 4. Group students by agent
         const tasksByAgent = {};
@@ -359,6 +314,20 @@ app.get('/api/cron/send-reminders', async (req, res) => {
         
         // 5. Send emails
         if (!transporter) {
+            console.log('CRON: Transporter not initialized, creating a new one.');
+            transporter = nodemailer.createTransport({
+                service: 'gmail',
+                auth: {
+                    type: 'OAuth2',
+                    user: EMAIL_USER,
+                    clientId: EMAIL_CLIENT_ID,
+                    clientSecret: EMAIL_CLIENT_SECRET,
+                    refreshToken: EMAIL_REFRESH_TOKEN,
+                },
+            });
+        }
+
+        if (!EMAIL_USER || !EMAIL_CLIENT_ID) {
             console.error("CRON: Email service is not configured.");
             return res.status(500).json({ message: "Email service not configured on server." });
         }
@@ -483,14 +452,19 @@ app.post('/api/send-email', async (req, res) => {
     }
 });
 
-// --- SERVER START (for local development) ---
-if (process.env.NODE_ENV !== 'production') {
-    app.listen(PORT, () => {
-        console.log(`🚀 Server running locally on port ${PORT}`);
-    });
-} else {
-    console.log('--- PRODUCTION MODE: SKIPPING app.listen() ---');
-}
+// --- SERVER START ---
+const startServer = async () => {
+    await connectToDatabase();
+    
+    // This is for local development. For Vercel, the export is what matters.
+    if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+        app.listen(PORT, () => {
+            console.log(`🚀 Server running locally on port ${PORT}`);
+        });
+    }
+};
+
+startServer();
 
 console.log('--- SERVER.JS EXECUTION END ---');
 // Export for Vercel serverless functions
