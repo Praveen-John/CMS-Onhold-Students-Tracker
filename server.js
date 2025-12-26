@@ -365,32 +365,6 @@ app.get('/api/cron/send-reminders', async (req, res) => {
         console.log(summary);
         await logActivity('CRON_JOB', summary);
 
-        // --- START OF CHANGE: Update reminder dates for processed students ---
-        if (sentCount > 0) {
-            try {
-                const remindedStudentIds = studentsToRemind.map(s => s._id); 
-                const nextWeek = new Date();
-                nextWeek.setDate(nextWeek.getDate() + 7);
-                const nextReminderDate = nextWeek.toISOString().split('T')[0];
-
-                console.log(`CRON: Updating reminderDate for ${remindedStudentIds.length} students to ${nextReminderDate}.`);
-                
-                const updateResult = await Student.updateMany(
-                    { _id: { $in: remindedStudentIds } },
-                    { $set: { reminderDate: nextReminderDate } }
-                );
-
-                console.log(`CRON: Database update result: ${updateResult.matchedCount} matched, ${updateResult.modifiedCount} modified.`);
-                await logActivity('CRON_JOB_UPDATE', `Updated reminderDate for ${updateResult.modifiedCount} students.`);
-            } catch (updateError) {
-                console.error('CRON: Failed to update student reminder dates:', updateError.message);
-                await logActivity('CRON_JOB_FAILED', `Failed to update reminder dates: ${updateError.message}`);
-                // Note: The job will still report success for the email sending part,
-                // but this log indicates a failure in the state update.
-            }
-        }
-        // --- END OF CHANGE ---
-        
         res.status(200).json({ message: 'Cron job completed.', sent: sentCount, failed: failedCount });
 
     } catch (error) {
