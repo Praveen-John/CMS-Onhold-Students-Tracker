@@ -10,11 +10,11 @@ interface ActivitiesProps {
 const Activities: React.FC<ActivitiesProps> = ({ activities }) => {
   const [filterUser, setFilterUser] = useState('');
 
-  // Get unique users for filter dropdown
-  const users = [...new Set(activities.map(a => a.user))];
+  // Get unique users for filter dropdown (handle missing user field)
+  const users = [...new Set(activities.map(a => a.user || 'System').filter(Boolean))];
 
-  const filteredActivities = filterUser 
-    ? activities.filter(a => a.user === filterUser) 
+  const filteredActivities = filterUser
+    ? activities.filter(a => (a.user || 'System') === filterUser)
     : activities;
 
   const getActionBadgeClass = (action: string) => {
@@ -77,29 +77,33 @@ const Activities: React.FC<ActivitiesProps> = ({ activities }) => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                        {filteredActivities.map((activity) => (
-                            <tr key={activity.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        {filteredActivities.map((activity) => {
+                            const user = activity.user || 'System';
+                            const userInitial = user.substring(0, 1);
+                            return (
+                            <tr key={activity.id || activity._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap font-mono text-xs">
                                     {activity.timestamp}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="flex items-center">
                                         <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300 mr-2 uppercase">
-                                            {activity.user.substring(0, 1)}
+                                            {userInitial}
                                         </div>
-                                        <span className="font-medium text-slate-900 dark:text-white">{activity.user}</span>
+                                        <span className="font-medium text-slate-900 dark:text-white">{user}</span>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getActionBadgeClass(activity.action)}`}>
-                                        {activity.action.replace('_', ' ')}
+                                        {activity.action.replace(/_/g, ' ')}
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
                                     {activity.details}
                                 </td>
                             </tr>
-                        ))}
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>

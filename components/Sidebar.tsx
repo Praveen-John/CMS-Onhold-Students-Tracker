@@ -12,11 +12,12 @@ import {
 } from './icons';
 
 interface SidebarProps {
-    activeSegment: string;
-    onSelect: (segment: string) => void;
-    isMobileOpen: boolean;
-    onCloseMobile: () => void;
-    currentUser: string | null;
+    activeTab: string;
+    onTabChange: (tab: string) => void;
+    isOpen: boolean;
+    onClose: () => void;
+    currentUser: string;
+    isAdmin: boolean;
 }
 
 const navItems = [
@@ -30,9 +31,7 @@ const navItems = [
 
 const ADMIN_USERS = ['praveen_k@lmes.in', 'support@lmes.in'];
 
-const Sidebar: React.FC<SidebarProps> = ({ activeSegment, onSelect, isMobileOpen, onCloseMobile, currentUser }) => {
-    
-    const isAdmin = currentUser && ADMIN_USERS.includes(currentUser.toLowerCase());
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isOpen, onClose, currentUser, isAdmin }) => {
 
     // Filter Nav Items based on role
     const filteredNavItems = navItems.filter(item => {
@@ -53,8 +52,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSegment, onSelect, isMobileOpen
                         CMS Tracker
                     </h2>
                 </div>
-                <button 
-                    onClick={onCloseMobile} 
+                <button
+                    onClick={onClose}
                     className="md:hidden p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400"
                 >
                     <CloseIcon className="w-6 h-6" />
@@ -67,13 +66,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSegment, onSelect, isMobileOpen
                 </div>
                 {filteredNavItems.map((item) => {
                     const Icon = item.icon;
-                    const isActive = activeSegment === item.id;
+                    const isActive = activeTab === item.id;
                     return (
                         <button
                             key={item.id}
                             onClick={() => {
-                                onSelect(item.id);
-                                onCloseMobile();
+                                onTabChange(item.id);
+                                onClose();
                             }}
                             className={`group flex items-center justify-between w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ease-in-out ${
                                 isActive
@@ -103,16 +102,16 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSegment, onSelect, isMobileOpen
             </div>
 
             {/* Mobile Backdrop */}
-            {isMobileOpen && (
-                <div 
-                    className="fixed inset-0 bg-slate-900/50 z-40 md:hidden backdrop-blur-sm transition-opacity" 
-                    onClick={onCloseMobile}
+            {isOpen && (
+                <div
+                    className="fixed inset-0 bg-slate-900/50 z-40 md:hidden backdrop-blur-sm transition-opacity"
+                    onClick={onClose}
                 />
             )}
 
             {/* Mobile Sidebar */}
             <div className={`fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out md:hidden ${
-                isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+                isOpen ? 'translate-x-0' : '-translate-x-full'
             }`}>
                 {sidebarContent}
             </div>

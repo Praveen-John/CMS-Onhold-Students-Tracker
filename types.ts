@@ -1,4 +1,15 @@
 
+export interface User {
+  _id: string;
+  googleId?: string;
+  email: string;
+  name: string;
+  picture?: string;
+  isAdmin: boolean;
+  createdAt: string;
+  lastLogin: string;
+}
+
 export interface Student {
   id: string;
   initiatedDate: string;

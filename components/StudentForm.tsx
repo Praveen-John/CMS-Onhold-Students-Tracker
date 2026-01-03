@@ -286,7 +286,7 @@ const StudentForm: React.FC<StudentFormProps> = ({
               value={formData.phoneNumber}
               onChange={handleChange}
               maxLength={20}
-              pattern="^[+\d][\d\s-]{6,19}$"
+              pattern="^[+0-9][0-9\s\-]{6,19}$"
               className="w-full bg-white dark:bg-slate-900 border border-black dark:border-slate-600 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 text-slate-900 dark:text-slate-200 p-2.5"
             />
           </div>

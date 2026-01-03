@@ -108,3 +108,5 @@ email-test-*
 # Temporary files
 *.tmp
 *.temp
+
+.claude

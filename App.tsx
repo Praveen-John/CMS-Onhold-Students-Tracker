@@ -1,21 +1,32 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import type { Student, Activity } from './types';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import type { Student, Activity, User as UserType } from './types';
 import { Status, teams, schoolSections, initiators } from './types';
 import StudentForm from './components/StudentForm';
 import StudentTable from './components/StudentTable';
 import GeminiAnalysisModal from './components/GeminiAnalysisModal';
 import Sidebar from './components/Sidebar';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import OAuthLoginScreen from './components/OAuthLoginScreen';
 import LoginScreen from './components/LoginScreen';
 import Activities from './components/Activities';
 import TeamTasks from './components/TeamTasks';
+import UserManagement from './components/UserManagement';
 import { MenuIcon, SparklesIcon, UsersIcon, ChartBarIcon, HomeIcon, FunnelIcon, ArrowPathIcon, UserPlusIcon, SunIcon, MoonIcon, ExclamationCircleIcon, EnvelopeIcon, LoaderIcon, CheckCircleIcon, ClipboardDocumentListIcon } from './components/icons';
+import LOGIN_TYPE from './login.config';
 
 // --- CONFIGURATION ---
-const STORAGE_KEY_USER = 'cms_user_session_v1';
+const STORAGE_KEY_USER = 'cms_user_session_v2';
 const API_BASE_URL = import.meta.env.PROD ? '/api' : 'http://localhost:5000/api'; // Production uses relative API calls
-const ADMIN_USERS = ['praveen_k@lmes.in', 'nawinrexroy_j@lmes.in'];
+
+// User interface for app state
+interface AppUser {
+  email: string;
+  name: string;
+  picture?: string;
+  isAdmin: boolean;
+}
 
 // Helper to generate HTML table for emails
 const generateEmailTable = (students: Student[], title: string, agentName: string) => {
@@ -56,32 +67,31 @@ const App = () => {
   // --- State Management ---
   const [students, setStudents] = useState<Student[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
-  
-  // User session is still kept in LocalStorage for persistence across refreshes
-  const [user, setUser] = useState<string | null>(() => {
-      return localStorage.getItem(STORAGE_KEY_USER);
-  });
+
+  // User session with OAuth support - will be validated on mount
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [activeSegment, setActiveSegment] = useState('Dashboard');
   const [darkMode, setDarkMode] = useState(false);
-  
+
   const [selectedStudentForAnalysis, setSelectedStudentForAnalysis] = useState<Student | null>(null);
   const [studentToEdit, setStudentToEdit] = useState<Student | null>(null);
-  
+
   // UI Feedback State
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [dbError, setDbError] = useState(false);
 
-  const isAdmin = user && ADMIN_USERS.includes(user.toLowerCase());
+  const isAdmin = user?.isAdmin || false;
 
   // --- Data Fetching ---
   const fetchData = async () => {
       try {
           const [studentsRes, activitiesRes] = await Promise.all([
-              fetch(`${API_BASE_URL}/students`),
-              fetch(`${API_BASE_URL}/activities`)
+              fetch(`${API_BASE_URL}/students`, { credentials: 'include' }),
+              fetch(`${API_BASE_URL}/activities`, { credentials: 'include' })
           ]);
 
           if (!studentsRes.ok || !activitiesRes.ok) throw new Error('Failed to fetch data');
@@ -106,11 +116,40 @@ const App = () => {
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem(STORAGE_KEY_USER, user);
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
     } else {
       localStorage.removeItem(STORAGE_KEY_USER);
     }
   }, [user]);
+
+  useEffect(() => {
+    // Check for existing session on mount
+    const checkSession = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' });
+        if (res.ok) {
+          const userData = await res.json();
+          setUser({
+            email: userData.email,
+            name: userData.name,
+            picture: userData.picture,
+            isAdmin: userData.isAdmin
+          });
+        } else {
+          // Session invalid, clear local storage
+          localStorage.removeItem(STORAGE_KEY_USER);
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Session check failed:', error);
+        localStorage.removeItem(STORAGE_KEY_USER);
+        setUser(null);
+      }
+      setSessionChecked(true);
+    };
+
+    checkSession();
+  }, []);
 
   useEffect(() => {
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -139,15 +178,15 @@ const App = () => {
       if (isAdmin) {
           return students;
       }
-      const currentUserInitiator = initiators.find(i => i.email.toLowerCase() === user.toLowerCase());
+      const currentUserInitiator = initiators.find(i => i.email.toLowerCase() === user.email.toLowerCase());
       const currentUserName = currentUserInitiator ? currentUserInitiator.name : '';
-      return students.filter(s => s.createdByEmail === user || s.initiatedBy === currentUserName);
+      return students.filter(s => s.createdByEmail === user.email || s.initiatedBy === currentUserName);
   }, [students, user, isAdmin]);
 
   // --- Actions ---
 
   const logActivity = async (action: Activity['action'], details: string, specificUser?: string) => {
-    const actor = specificUser || user;
+    const actor = specificUser || user?.email;
     if (!actor) return;
 
     const newActivity = {
@@ -171,12 +210,51 @@ const App = () => {
     }
   };
 
-  const handleLogin = (email: string) => {
-    setUser(email);
-    logActivity('LOGIN', 'User logged in successfully', email);
+  const handleLogin = async (email: string, name: string, picture: string) => {
+    try {
+      // Fetch user data from backend to get admin status
+      const res = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' });
+
+      if (res.ok) {
+        const userData = await res.json();
+        setUser({
+          email: userData.email,
+          name: userData.name,
+          picture: userData.picture,
+          isAdmin: userData.isAdmin
+        });
+        logActivity('LOGIN', 'User logged in successfully', userData.email);
+      } else {
+        // Fallback if backend doesn't have user yet
+        setUser({
+          email,
+          name,
+          picture,
+          isAdmin: false
+        });
+        logActivity('LOGIN', 'User logged in successfully', email);
+      }
+    } catch (e) {
+      // Fallback on error
+      setUser({
+        email,
+        name,
+        picture,
+        isAdmin: false
+      });
+      logActivity('LOGIN', 'User logged in successfully', email);
+    }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
     logActivity('LOGOUT', 'User logged out');
     setUser(null);
     setActiveSegment('Dashboard');
@@ -187,7 +265,7 @@ const App = () => {
   const handleAddStudent = async (newStudent: Student) => {
     const studentWithUser = {
         ...newStudent,
-        createdByEmail: user || 'unknown',
+        createdByEmail: user?.email || 'unknown',
     };
     
     try {
@@ -350,8 +428,23 @@ const App = () => {
 
   // --- Render Logic ---
 
+  // Show loading while checking session
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-purple-900">
+        <div className="text-center">
+          <LoaderIcon className="w-12 h-12 animate-spin text-purple-600 mx-auto mb-4" />
+          <p className="text-slate-600 dark:text-slate-400">Verifying session...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
-    return <LoginScreen onLogin={handleLogin} />;
+    // Use LOGIN_TYPE from config to switch between login methods
+    return LOGIN_TYPE === 'oauth'
+      ? <OAuthLoginScreen onLogin={handleLogin} />
+      : <LoginScreen onLogin={(email) => handleLogin(email, '', '')} />;
   }
 
   if (dbError) {
@@ -383,7 +476,7 @@ const App = () => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <h1 className="text-2xl font-bold text-slate-800 dark:text-white">
-                            Welcome back, {user.split('@')[0]}
+                            Welcome back, {user.name.split(' ')[0]}
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 mt-1">
                             Here's what's happening with your tracked students today.
@@ -492,11 +585,18 @@ const App = () => {
         return <AnalyticsDashboard students={viewableStudents} />;
       case 'Settings':
         return (
-            <div className="max-w-2xl mx-auto animate-fade-in space-y-6">
+            <div className="max-w-6xl mx-auto animate-fade-in space-y-6">
                  <div className="mb-6">
                     <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Settings</h2>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage your application preferences.</p>
                  </div>
+
+                 {/* User Management for Admins */}
+                 {isAdmin && (
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                        <UserManagement currentUser={user.email} onBack={() => {}} />
+                    </div>
+                 )}
                  
                  <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
                     <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Appearance</h3>
@@ -524,10 +624,10 @@ const App = () => {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                             <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-purple-700 dark:text-purple-300 font-bold">
-                                {user.substring(0, 1).toUpperCase()}
+                                {user.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                                <p className="font-medium text-slate-900 dark:text-slate-200">{user}</p>
+                                <p className="font-medium text-slate-900 dark:text-slate-200">{user.email}</p>
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Currently logged in</p>
                             </div>
                         </div>
@@ -549,12 +649,12 @@ const App = () => {
   return (
     <div className={`flex h-screen bg-slate-50 dark:bg-slate-900 font-sans text-slate-900 dark:text-slate-100 transition-colors duration-200 ${darkMode ? 'dark' : ''}`}>
         
-        <Sidebar 
-            activeSegment={activeSegment} 
-            onSelect={setActiveSegment} 
+        <Sidebar
+            activeSegment={activeSegment}
+            onSelect={setActiveSegment}
             isMobileOpen={isMobileOpen}
             onCloseMobile={() => setIsMobileOpen(false)}
-            currentUser={user}
+            currentUser={user?.email}
         />
 
         <div className="flex-1 flex flex-col md:pl-64 overflow-hidden">

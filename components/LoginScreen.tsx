@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { SparklesIcon, LoaderIcon } from './icons';
 
+const API_BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:5000/api';
+
 interface LoginScreenProps {
-  onLogin: (email: string) => void;
+  onLogin: (email: string, name: string, picture: string) => void;
 }
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
@@ -10,32 +12,50 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
 
-    // Simulate backend processing delay
-    setTimeout(() => {
-      const normalizedEmail = email.trim().toLowerCase();
-      
-      if (!normalizedEmail) {
-        setError('Please enter your email address.');
-        setIsLoading(false);
-        return;
-      }
+    const normalizedEmail = email.trim().toLowerCase();
 
-      // SECURITY: Enforce domain restriction
-      if (!normalizedEmail.endsWith('@lmes.in')) {
-        setError('Access Restricted: Only authorized users (@lmes.in) can access this portal.');
-        setIsLoading(false);
-        return;
-      }
-
-      // Success
-      onLogin(normalizedEmail);
+    if (!normalizedEmail) {
+      setError('Please enter your email address.');
       setIsLoading(false);
-    }, 800);
+      return;
+    }
+
+    // SECURITY: Enforce domain restriction
+    if (!normalizedEmail.endsWith('@lmes.in')) {
+      setError('Access Restricted: Only authorized users (@lmes.in) can access this portal.');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Call backend simple login endpoint
+      const API_BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${API_BASE_URL}/auth/simple-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: normalizedEmail })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'Authentication failed' }));
+        throw new Error(errorData.message || 'Authentication failed');
+      }
+
+      const userData = await res.json();
+      onLogin(userData.email, userData.name, userData.picture);
+    } catch (err: any) {
+      const errorMsg = err?.message || 'Authentication failed';
+      console.error('Login error:', err);
+      setError(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
