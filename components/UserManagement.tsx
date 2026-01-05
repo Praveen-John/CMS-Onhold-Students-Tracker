@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UsersIcon, ShieldIcon, ExclamationCircleIcon, CheckCircleIcon, LoaderIcon } from './icons';
 
-const API_BASE_URL = import.meta.env.PROD ? '/api' : 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:5000/api';
 
 interface User {
   _id: string;
