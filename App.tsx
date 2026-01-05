@@ -402,7 +402,7 @@ const App = () => {
         const subject = `[${agentName}] [Reminder] ${autoLabel || 'Action Required'} - Follow-ups for ${agentTasks.length} students`;
 
         try {
-            await sendEmailViaBackend("gokul_s@lmes.in", subject, emailBody);
+            await sendEmailViaBackend("operation@lmes.in", subject, emailBody);
             sentCount++;
         } catch (err) {
             console.error(`Failed to send to operation@lmes.in for agent ${agentName}`, err);
