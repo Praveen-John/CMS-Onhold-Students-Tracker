@@ -104,7 +104,7 @@ const OAuthLoginScreen: React.FC<OAuthLoginScreenProps> = ({ onLogin }) => {
     setError(null);
 
     try {
-      const res = await fetch('/api/auth/google/verify', {
+      const res = await fetch(`${API_BASE_URL}/auth/google/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
