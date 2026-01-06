@@ -18,11 +18,28 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // --- MIDDLEWARE ---
+const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://holdtracker-praveenjohn.vercel.app',
+    process.env.CLIENT_URL,
+    process.env.PRODUCTION_CLIENT_URL
+].filter(Boolean);
+
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:5173', process.env.CLIENT_URL].filter(Boolean),
+    origin: function(origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'CORS policy: This origin is not authorized';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Set-Cookie']
 }));
 app.use(express.json());
 app.use(cookieParser());
@@ -31,8 +48,9 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NODE_ENV === 'production', // true in production, false in dev
         httpOnly: true,
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
@@ -327,8 +345,9 @@ app.get('/api/auth/google/callback',
             res.cookie('token', token, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-                maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+                domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined
             });
 
             // Redirect to frontend
@@ -405,8 +424,9 @@ app.post('/api/auth/simple-login', async (req, res) => {
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 24 * 60 * 60 * 1000 // 24 hours
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined
         });
 
         res.json({
@@ -542,8 +562,9 @@ app.post('/api/auth/google/verify', async (req, res) => {
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 7 * 24 * 60 * 60 * 1000
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined
         });
 
         res.json({
@@ -717,12 +738,16 @@ app.get('/api/activities', authenticateToken, async (req, res) => {
 // 6. Log activity
 app.post('/api/activities', authenticateToken, async (req, res) => {
     console.log('POST /api/activities');
+    console.log('Request body:', req.body);
+    console.log('User from token:', req.user);
     try {
         const newActivity = new Activity(req.body);
         const savedActivity = await newActivity.save();
+        console.log('Activity saved successfully:', savedActivity.id);
         res.status(201).json(savedActivity);
     } catch (err) {
         console.error('Error in POST /api/activities:', err.message);
+        console.error('Full error:', err);
         res.status(400).json({ message: "Failed to log activity", error: err.message });
     }
 });

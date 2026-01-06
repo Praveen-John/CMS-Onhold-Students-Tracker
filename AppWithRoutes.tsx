@@ -7,7 +7,23 @@ import LoginScreen from './components/LoginScreen';
 import LOGIN_TYPE from './login.config';
 import type { Student, Activity, User as UserType } from './types';
 
-const API_BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:5000/api';
+// Auto-detect API base URL based on environment
+const getApiBaseUrl = () => {
+  // If VITE_BASE_URL is set, use it
+  if (import.meta.env.VITE_BASE_URL) {
+    return import.meta.env.VITE_BASE_URL;
+  }
+
+  // In production, use relative URL (same domain)
+  if (import.meta.env.PROD) {
+    return '/api';
+  }
+
+  // Development fallback
+  return 'http://localhost:5000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // User interface for app state
 interface AppUser {
@@ -36,6 +52,43 @@ const AppWithRoutes: React.FC = () => {
             picture: userData.picture,
             isAdmin: userData.isAdmin
           });
+
+          // Only log login activity if this is a new session (not already logged in state)
+          const hasLoggedBefore = sessionStorage.getItem('login_logged');
+          console.log('AppWithRoutes - Session check for:', userData.email, 'hasLoggedBefore:', hasLoggedBefore);
+
+          if (!hasLoggedBefore) {
+            console.log('AppWithRoutes - Logging first-time login for:', userData.email);
+
+            // Set flag immediately to prevent race conditions
+            sessionStorage.setItem('login_logged', 'true');
+
+            // Log login activity
+            const newActivity = {
+              id: Date.now().toString(),
+              user: userData.email,
+              action: 'LOGIN',
+              details: 'User logged in successfully',
+              timestamp: new Date().toLocaleString()
+            };
+
+            const activityRes = await fetch(`${API_BASE_URL}/activities`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify(newActivity)
+            });
+
+            if (activityRes.ok) {
+              console.log('AppWithRoutes - Login activity logged successfully');
+            } else {
+              console.error('AppWithRoutes - Failed to log activity, status:', activityRes.status);
+              // Clear flag if logging failed so it can retry
+              sessionStorage.removeItem('login_logged');
+            }
+          } else {
+            console.log('AppWithRoutes - Skipping duplicate login log for:', userData.email);
+          }
         } else {
           // Session invalid, clear local storage
           localStorage.removeItem(STORAGE_KEY_USER);
@@ -103,6 +156,7 @@ const AppWithRoutes: React.FC = () => {
     } catch (e) {
       console.error('Logout error:', e);
     }
+    sessionStorage.removeItem('login_logged'); // Clear the login flag
     setUser(null);
   };
 

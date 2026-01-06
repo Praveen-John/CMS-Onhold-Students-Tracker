@@ -18,7 +18,23 @@ import LOGIN_TYPE from './login.config';
 
 // --- CONFIGURATION ---
 const STORAGE_KEY_USER = 'cms_user_session_v2';
-const API_BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:5000/api'; // Production uses relative API calls
+// Auto-detect API base URL based on environment
+const getApiBaseUrl = () => {
+  // If VITE_BASE_URL is set, use it
+  if (import.meta.env.VITE_BASE_URL) {
+    return import.meta.env.VITE_BASE_URL;
+  }
+
+  // In production, use relative URL (same domain)
+  if (import.meta.env.PROD) {
+    return '/api';
+  }
+
+  // Development fallback
+  return 'http://localhost:5000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // User interface for app state
 interface AppUser {
@@ -187,7 +203,10 @@ const App = () => {
 
   const logActivity = async (action: Activity['action'], details: string, specificUser?: string) => {
     const actor = specificUser || user?.email;
-    if (!actor) return;
+    if (!actor) {
+      console.log('logActivity called but no actor found');
+      return;
+    }
 
     const newActivity = {
       id: Date.now().toString(),
@@ -197,16 +216,29 @@ const App = () => {
       timestamp: new Date().toLocaleString()
     };
 
+    console.log('App.tsx - Logging activity:', newActivity);
+
     try {
-        await fetch(`${API_BASE_URL}/activities`, {
+        const response = await fetch(`${API_BASE_URL}/activities`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify(newActivity)
         });
-        // Optimistic update
-        setActivities(prev => [newActivity as Activity, ...prev]);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('App.tsx - Failed to log activity:', response.status, errorText);
+          return;
+        }
+
+        const savedActivity = await response.json();
+        console.log('App.tsx - Activity logged successfully:', savedActivity);
+
+        // Update with server response
+        setActivities(prev => [savedActivity, ...prev]);
     } catch (e) {
-        console.error("Failed to log activity", e);
+        console.error("App.tsx - Failed to log activity", e);
     }
   };
 

@@ -1,7 +1,23 @@
 import React, { useState } from 'react';
 import { SparklesIcon, LoaderIcon } from './icons';
 
-const API_BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:5000/api';
+// Auto-detect API base URL based on environment
+const getApiBaseUrl = () => {
+  // If VITE_BASE_URL is set, use it
+  if (import.meta.env.VITE_BASE_URL) {
+    return import.meta.env.VITE_BASE_URL;
+  }
+
+  // In production, use relative URL (same domain)
+  if (import.meta.env.PROD) {
+    return '/api';
+  }
+
+  // Development fallback
+  return 'http://localhost:5000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 interface LoginScreenProps {
   onLogin: (email: string, name: string, picture: string) => void;
@@ -34,7 +50,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
     try {
       // Call backend simple login endpoint
-      const API_BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:5000/api';
       const res = await fetch(`${API_BASE_URL}/auth/simple-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -15,7 +15,23 @@ import { MenuIcon, SparklesIcon, UsersIcon, ChartBarIcon, HomeIcon, FunnelIcon, 
 
 // --- CONFIGURATION ---
 const STORAGE_KEY_USER = 'cms_user_session_v2';
-const API_BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:5000/api';
+// Auto-detect API base URL based on environment
+const getApiBaseUrl = () => {
+  // If VITE_BASE_URL is set, use it
+  if (import.meta.env.VITE_BASE_URL) {
+    return import.meta.env.VITE_BASE_URL;
+  }
+
+  // In production, use relative URL (same domain)
+  if (import.meta.env.PROD) {
+    return '/api';
+  }
+
+  // Development fallback
+  return 'http://localhost:5000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // User interface for app state
 interface AppUser {
@@ -211,23 +227,33 @@ const AppContent: React.FC<{ user: AppUser | null; setUser: (user: AppUser | nul
       const actor = specificUser || user?.email || 'unknown';
 
       const newActivity = {
+        id: Date.now().toString(),
         action,
         details,
         user: actor,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toLocaleString()
       };
 
-      await fetch(`${API_BASE_URL}/activities`, {
+      console.log('Logging activity:', newActivity);
+
+      const response = await fetch(`${API_BASE_URL}/activities`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(newActivity)
       });
-      // Optimistic update - let server generate the ID
-      setActivities(prev => [{
-        ...newActivity,
-        id: `temp-${Date.now()}` // Temporary ID for optimistic update
-      } as Activity, ...prev]);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to log activity:', response.status, errorText);
+        return;
+      }
+
+      const savedActivity = await response.json();
+      console.log('Activity logged successfully:', savedActivity);
+
+      // Add to activities list with the server-generated ID
+      setActivities(prev => [savedActivity, ...prev]);
     } catch (e) {
       console.error("Failed to log activity", e);
     }
@@ -246,6 +272,9 @@ const AppContent: React.FC<{ user: AppUser | null; setUser: (user: AppUser | nul
           picture: userData.picture,
           isAdmin: userData.isAdmin
         });
+
+        // Note: Login activity is logged by the backend and in the session check effect
+        // No need to log here to avoid duplicates
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -253,6 +282,9 @@ const AppContent: React.FC<{ user: AppUser | null; setUser: (user: AppUser | nul
   };
 
   const handleLogout = async () => {
+    // Log logout activity before clearing user
+    await logActivity('LOGOUT', 'User logged out', user?.email);
+
     try {
       await fetch(`${API_BASE_URL}/auth/logout`, {
         method: 'POST',
@@ -262,6 +294,7 @@ const AppContent: React.FC<{ user: AppUser | null; setUser: (user: AppUser | nul
       console.error('Logout error:', error);
     } finally {
       localStorage.removeItem(STORAGE_KEY_USER);
+      sessionStorage.removeItem('login_logged'); // Clear the login flag
       setUser(null);
       navigate('/');
     }

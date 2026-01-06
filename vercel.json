@@ -15,13 +15,20 @@
   ],
   "routes": [
     {
-      "src": "/api/.*",
-      "dest": "server.js"
+      "src": "/api/(.*)",
+      "dest": "/server.js"
     },
     {
       "src": "/assets/(.*)",
       "headers": { "cache-control": "s-maxage=31536000,immutable" },
       "dest": "/dist/assets/$1"
+    },
+    {
+      "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot))$",
+      "dest": "/dist/$1"
+    },
+    {
+      "handle": "filesystem"
     },
     {
       "src": "/(.*)",

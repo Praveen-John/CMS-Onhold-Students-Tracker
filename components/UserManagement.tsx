@@ -1,7 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { UsersIcon, ShieldIcon, ExclamationCircleIcon, CheckCircleIcon, LoaderIcon } from './icons';
 
-const API_BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:5000/api';
+// Auto-detect API base URL based on environment
+const getApiBaseUrl = () => {
+  // If VITE_BASE_URL is set, use it
+  if (import.meta.env.VITE_BASE_URL) {
+    return import.meta.env.VITE_BASE_URL;
+  }
+
+  // In production, use relative URL (same domain)
+  if (import.meta.env.PROD) {
+    return '/api';
+  }
+
+  // Development fallback
+  return 'http://localhost:5000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 interface User {
   _id: string;
