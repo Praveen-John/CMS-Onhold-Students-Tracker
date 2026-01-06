@@ -49,12 +49,6 @@
       ]
     }
   ],
-  "functions": {
-    "api/*.js": {
-      "memory": 1024,
-      "maxDuration": 10
-    }
-  },
   "crons": [
     { "path": "/api/cron/send-reminders", "schedule": "30 4 * * *" },
     { "path": "/api/cron/send-reminders", "schedule": "30 10 * * *" }
