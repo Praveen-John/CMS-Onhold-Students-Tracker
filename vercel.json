@@ -5,6 +5,10 @@
     {
       "source": "/api/:path*",
       "destination": "/server.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [
