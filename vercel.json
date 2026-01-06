@@ -27,7 +27,11 @@
       "dest": "/dist/$1"
     },
     {
+      "handle": "filesystem"
+    },
+    {
       "src": "/(.*)",
+      "status": 200,
       "dest": "/dist/index.html"
     }
   ],
