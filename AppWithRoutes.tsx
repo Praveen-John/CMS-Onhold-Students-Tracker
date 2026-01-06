@@ -53,15 +53,16 @@ const AppWithRoutes: React.FC = () => {
             isAdmin: userData.isAdmin
           });
 
-          // Only log login activity if this is a new session (not already logged in state)
-          const hasLoggedBefore = sessionStorage.getItem('login_logged');
-          console.log('AppWithRoutes - Session check for:', userData.email, 'hasLoggedBefore:', hasLoggedBefore);
+          // Use a more robust flag: email + timestamp key
+          const loginKey = `login_logged_${userData.email}`;
+          const hasLoggedBefore = sessionStorage.getItem(loginKey);
+          console.log('AppWithRoutes - Session check for:', userData.email, 'hasLoggedBefore:', hasLoggedBefore, 'loginKey:', loginKey);
 
           if (!hasLoggedBefore) {
             console.log('AppWithRoutes - Logging first-time login for:', userData.email);
 
             // Set flag immediately to prevent race conditions
-            sessionStorage.setItem('login_logged', 'true');
+            sessionStorage.setItem(loginKey, 'true');
 
             // Log login activity
             const newActivity = {
@@ -84,7 +85,7 @@ const AppWithRoutes: React.FC = () => {
             } else {
               console.error('AppWithRoutes - Failed to log activity, status:', activityRes.status);
               // Clear flag if logging failed so it can retry
-              sessionStorage.removeItem('login_logged');
+              sessionStorage.removeItem(loginKey);
             }
           } else {
             console.log('AppWithRoutes - Skipping duplicate login log for:', userData.email);
@@ -148,6 +149,12 @@ const AppWithRoutes: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    // Clear the login flag for this user
+    if (user?.email) {
+      const loginKey = `login_logged_${user.email}`;
+      sessionStorage.removeItem(loginKey);
+    }
+
     try {
       await fetch(`${API_BASE_URL}/auth/logout`, {
         method: 'POST',
@@ -156,7 +163,6 @@ const AppWithRoutes: React.FC = () => {
     } catch (e) {
       console.error('Logout error:', e);
     }
-    sessionStorage.removeItem('login_logged'); // Clear the login flag
     setUser(null);
   };
 
