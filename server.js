@@ -148,7 +148,15 @@ if (!MONGO_URI) {
 }
 
 // --- MONGODB CONNECTION ---
+let isConnected = false;
+
 const connectToDatabase = async () => {
+    // Return cached connection if available
+    if (isConnected) {
+        console.log('✅ Using cached MongoDB connection');
+        return;
+    }
+
     try {
         // The options are simplified for broader compatibility and include Mongoose 6+ defaults
         const opts = {
@@ -159,19 +167,17 @@ const connectToDatabase = async () => {
 
         console.log('Attempting to connect to MongoDB...');
         await mongoose.connect(MONGO_URI, opts);
+        isConnected = true;
         console.log('✅✅✅ MongoDB Connection Successful');
 
     } catch (err) {
         console.error('❌❌❌ MongoDB Connection Error:', err.message);
-        // In a local dev environment, you might want the server to exit if it can't connect.
-        // In a serverless/production environment, the container would likely crash and restart,
-        // which might be the desired behavior.
-        process.exit(1);
+        isConnected = false;
+        throw err;
     }
 };
 
-// We will call this function before starting the server
-// This replaces the scattered connection logic.
+// We will call this function lazily before each API request in serverless environments
 
 
 // --- SCHEMAS ---
@@ -293,6 +299,17 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && JWT_SECRET) {
 
 // --- AUTHENTICATION MIDDLEWARE ---
 
+// Middleware to ensure DB is connected before handling requests
+const ensureDatabaseConnected = async (req, res, next) => {
+    try {
+        await connectToDatabase();
+        next();
+    } catch (err) {
+        console.error('Failed to connect to database:', err);
+        res.status(503).json({ message: 'Database connection failed' });
+    }
+};
+
 const authenticateToken = (req, res, next) => {
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
 
@@ -317,6 +334,9 @@ const authenticateAdmin = (req, res, next) => {
 };
 
 // --- AUTH ROUTES ---
+
+// Apply DB connection middleware to all /api routes
+app.use('/api', ensureDatabaseConnected);
 
 // Google OAuth login endpoint
 app.get('/api/auth/google',
