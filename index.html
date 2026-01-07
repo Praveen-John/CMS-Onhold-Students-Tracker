@@ -29,50 +29,9 @@
         }
       }
     </script>
-<script type="importmap">
-{
-  "imports": {
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "dompurify": "https://esm.sh/dompurify@3.0.9"
-  }
-}
-</script>
-<style>
-    /* Custom Scrollbar Logic */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-
-    /* Light Mode Scrollbar */
-    ::-webkit-scrollbar-track {
-        background: #f8fafc; /* slate-50 (lighter track for white bg) */
-    }
-    ::-webkit-scrollbar-thumb {
-        background: #cbd5e1; /* slate-300 */
-        border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8; /* slate-400 */
-    }
-
-    /* Dark Mode Scrollbar (Overrides) */
-    .dark ::-webkit-scrollbar-track {
-        background: #0f172a; /* slate-900 */
-    }
-    .dark ::-webkit-scrollbar-thumb {
-        background: #334155; /* slate-700 */
-    }
-    .dark ::-webkit-scrollbar-thumb:hover {
-        background: #475569; /* slate-600 */
-    }
-</style>
 </head>
 <body class="bg-white dark:bg-slate-900">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

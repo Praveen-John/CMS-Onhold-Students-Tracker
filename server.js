@@ -43,21 +43,27 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-session-secret',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        secure: process.env.NODE_ENV === 'production', // true in production, false in dev
-        httpOnly: true,
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    }
-}));
+
+// Only use session middleware in non-Vercel environments
+if (!process.env.VERCEL) {
+    app.use(session({
+        secret: process.env.SESSION_SECRET || 'your-session-secret',
+        resave: false,
+        saveUninitialized: false,
+        cookie: {
+            secure: process.env.NODE_ENV === 'production',
+            httpOnly: true,
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            maxAge: 24 * 60 * 60 * 1000
+        }
+    }));
+}
 
 // Passport initialization
 app.use(passport.initialize());
-app.use(passport.session());
+if (!process.env.VERCEL) {
+    app.use(passport.session());
+}
 
 console.log('--- MIDDLEWARE INITIALIZED ---');
 
@@ -1032,8 +1038,11 @@ app.post('/api/admin/decrypt', authenticateToken, async (req, res) => {
 
 // --- SERVER START ---
 const startServer = async () => {
-    await connectToDatabase();
-    
+    // Only connect to DB in local development, not in Vercel serverless
+    if (!process.env.VERCEL) {
+        await connectToDatabase();
+    }
+
     // This is for local development. For Vercel, the export is what matters.
     if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
         app.listen(PORT, () => {
